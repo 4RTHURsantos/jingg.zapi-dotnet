@@ -220,8 +220,16 @@ public sealed class MessagesApi
         SendMediaAsync(to, "audio", media, options, cancellationToken);
     public Task<OutboundMessage> SendDocumentAsync(string to, MediaSource media, MediaOptions? options = null, CancellationToken cancellationToken = default) =>
         SendMediaAsync(to, "document", media, options, cancellationToken);
-    public Task<OutboundMessage> SendStickerAsync(string to, MediaSource media, MediaOptions? options = null, CancellationToken cancellationToken = default) =>
-        SendMediaAsync(to, "sticker", media, options, cancellationToken);
+    /// <summary>
+    /// Aceita PNG, JPEG, WebP, GIF ou vídeo curto: a API converte para WebP 512×512, animado quando a origem é.
+    /// </summary>
+    public Task<OutboundMessage> SendStickerAsync(string to, MediaSource media, StickerOptions? options = null, CancellationToken cancellationToken = default)
+    {
+        var fields = new Dictionary<string, object?> { ["media"] = media.ToPayload() };
+        if (options is { Pack: not null } or { Author: not null } or { Emojis.Count: > 0 })
+            fields["sticker"] = new { pack = options.Pack, author = options.Author, emojis = options.Emojis };
+        return SendAsync(to, "sticker", fields, options, cancellationToken);
+    }
 
     public Task<OutboundMessage> SendLocationAsync(string to, double latitude, double longitude, string? name = null, string? address = null, SendOptions? options = null, CancellationToken cancellationToken = default) =>
         SendAsync(to, "location", new() { ["latitude"] = latitude, ["longitude"] = longitude, ["name"] = name, ["address"] = address }, options, cancellationToken);

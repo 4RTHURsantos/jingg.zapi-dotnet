@@ -194,7 +194,10 @@ public record MediaInfo
     public int? Width { get; init; }
     public int? Height { get; init; }
     public bool? Ptt { get; init; }
+    /// <summary>sticker: é animada.</summary>
     public bool? Animated { get; init; }
+    /// <summary>sticker: vetorial (Lottie) — o arquivo guardado é um .was, não um WebP.</summary>
+    public bool? Lottie { get; init; }
     public string? Key { get; init; }
     /// <summary>URL temporária; expira — use <c>Messages.GetMediaUrlAsync</c> para uma nova.</summary>
     public string? Url { get; init; }
@@ -205,6 +208,7 @@ public record MessageLocation(double? Latitude, double? Longitude, string? Name,
 public record MessageContact(string? Name, string? Vcard);
 public record MessagePoll(string? Name, IReadOnlyList<string>? Options, int? SelectableCount);
 public record MessageSelection(string? Id, string? Text);
+public record StickerPackInfo(string? Id, string? Name, string? Publisher, int? Count);
 public record QuotedMessage(string Id, string? Sender);
 
 /// <summary>Mensagem recebida ou enviada, no formato normalizado da API.</summary>
@@ -220,7 +224,7 @@ public record Message
     public bool IsGroup { get; init; }
     public string? PushName { get; init; }
     public DateTimeOffset Timestamp { get; init; }
-    /// <summary>text, image, video, audio, document, sticker, location, contact, poll, button_reply, list_reply, group_invite, event, unknown.</summary>
+    /// <summary>text, image, video, audio, document, sticker, sticker_pack, location, contact, poll, button_reply, list_reply, group_invite, event, unknown.</summary>
     public string Type { get; init; } = "";
     public string? ContentType { get; init; }
     public string? Text { get; init; }
@@ -229,6 +233,8 @@ public record Message
     public IReadOnlyList<MessageContact>? Contacts { get; init; }
     public MessagePoll? Poll { get; init; }
     public MessageSelection? Selection { get; init; }
+    /// <summary>Preenchido quando <c>Type</c> é <c>sticker_pack</c>.</summary>
+    public StickerPackInfo? StickerPack { get; init; }
     public QuotedMessage? Quoted { get; init; }
     public IReadOnlyList<string>? Mentions { get; init; }
     public bool? ViewOnce { get; init; }
@@ -375,6 +381,15 @@ public record SendOptions
     /// é isso que torna seguras as retentativas automáticas.
     /// </summary>
     public string? IdempotencyKey { get; init; }
+}
+
+/// <summary>Dados exibidos quando o destinatário toca na figurinha.</summary>
+public record StickerOptions : SendOptions
+{
+    /// <summary>Nome do pacote.</summary>
+    public string? Pack { get; init; }
+    public string? Author { get; init; }
+    public IReadOnlyList<string>? Emojis { get; init; }
 }
 
 /// <summary>Opções de envio de mídia; cada campo vale para os tipos indicados.</summary>

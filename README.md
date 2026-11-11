@@ -39,6 +39,10 @@ await device.Messages.SendImageAsync("5511999990000", MediaSource.FromFile("foto
 await device.Messages.SendDocumentAsync("5511999990000", MediaSource.FromUrl("https://exemplo.com/boleto.pdf"),
     new MediaOptions { FileName = "boleto.pdf" });
 
+// figurinha: PNG, JPEG, WebP, GIF ou vídeo curto — a API converte (animada quando a origem é)
+await device.Messages.SendStickerAsync("5511999990000", MediaSource.FromUrl("https://exemplo.com/gato.gif"),
+    new StickerOptions { Pack = "Meu Pacote", Author = "Minha Empresa" });
+
 await device.Messages.WaitUntilSentAsync(sent.Id);   // opcional: aguarda sair da fila
 ```
 

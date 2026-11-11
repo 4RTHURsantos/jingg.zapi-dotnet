@@ -76,6 +76,22 @@ public class ClientTests
     }
 
     [Fact]
+    public async Task Figurinha_leva_pacote_e_autor_so_quando_informados()
+    {
+        var fake = new FakeHandler((_, _) => (HttpStatusCode.Accepted, Queued));
+        var messages = fake.Client().Device("d").Messages;
+        await messages.SendStickerAsync("1", MediaSource.FromUrl("https://exemplo.com/gato.gif"), new StickerOptions { Pack = "Gatos", Author = "Eu" });
+        await messages.SendStickerAsync("1", MediaSource.FromUrl("https://exemplo.com/gato.gif"));
+
+        var body = fake.Calls[0].Body!.Value;
+        Assert.Equal("sticker", body.GetProperty("type").GetString());
+        Assert.Equal("Gatos", body.GetProperty("sticker").GetProperty("pack").GetString());
+        Assert.Equal("Eu", body.GetProperty("sticker").GetProperty("author").GetString());
+        Assert.False(body.GetProperty("sticker").TryGetProperty("emojis", out _));
+        Assert.False(fake.Calls[1].Body!.Value.TryGetProperty("sticker", out _));
+    }
+
+    [Fact]
     public async Task Midia_em_bytes_vai_como_base64_e_opcoes_de_midia_entram_no_corpo()
     {
         var fake = new FakeHandler((_, _) => (HttpStatusCode.Accepted, Queued));
