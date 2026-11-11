@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Jingg.Zapi.Client/Jingg.Zapi.Client.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Jingg.Zapi.Client.Tests/Jingg.Zapi.Client.Tests.csproj" />
+  </Folder>
+</Solution>
