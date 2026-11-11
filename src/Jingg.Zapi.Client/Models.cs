@@ -34,8 +34,19 @@ public static class ZapiEventTypes
     public const string PresenceUpdate = "presence.update";
 }
 
+/// <summary>Configurações de comportamento de um dispositivo.</summary>
+public record DeviceSettings
+{
+    /// <summary>
+    /// Emite <c>presence.update</c> (digitando, gravando, online) de toda conversa que escrever para o dispositivo.
+    /// A conta passa a aparecer online, e o celular deixa de notificar mensagens novas.
+    /// </summary>
+    public bool? PresenceEvents { get; init; }
+}
+
 public record Device
 {
+    public DeviceSettings Settings { get; init; } = new();
     public string Id { get; init; } = "";
     public string Name { get; init; } = "";
     /// <summary><c>started</c> ou <c>stopped</c>.</summary>
@@ -82,6 +93,7 @@ public record CreateDeviceRequest
     /// <summary>Padrão true: o dispositivo já começa a gerar QR codes.</summary>
     public bool? Connect { get; init; }
     public WebhookInput? Webhook { get; init; }
+    public DeviceSettings? Settings { get; init; }
 }
 
 public record QrCode
@@ -209,7 +221,10 @@ public record MessageContact(string? Name, string? Vcard);
 public record MessagePoll(string? Name, IReadOnlyList<string>? Options, int? SelectableCount);
 public record MessageSelection(string? Id, string? Text);
 public record StickerPackInfo(string? Id, string? Name, string? Publisher, int? Count);
-public record QuotedMessage(string Id, string? Sender);
+/// <summary>A mensagem citada por uma resposta; <c>Type</c> e <c>Text</c> descrevem a mensagem citada.</summary>
+public record QuotedMessage(string Id, string? Sender, bool? FromMe = null, string? Type = null, string? Text = null);
+/// <summary>Reação atual de uma pessoa a uma mensagem.</summary>
+public record MessageReactionInfo(string Emoji, string Sender, string? SenderAlt, bool FromMe, DateTimeOffset Timestamp);
 
 /// <summary>Mensagem recebida ou enviada, no formato normalizado da API.</summary>
 public record Message
@@ -236,6 +251,8 @@ public record Message
     /// <summary>Preenchido quando <c>Type</c> é <c>sticker_pack</c>.</summary>
     public StickerPackInfo? StickerPack { get; init; }
     public QuotedMessage? Quoted { get; init; }
+    /// <summary>Reações atuais; vem nas mensagens consultadas na API, não nos eventos.</summary>
+    public IReadOnlyList<MessageReactionInfo>? Reactions { get; init; }
     public IReadOnlyList<string>? Mentions { get; init; }
     public bool? ViewOnce { get; init; }
     public bool? Forwarded { get; init; }
@@ -254,7 +271,31 @@ public record ConnectionUpdate(string Status, string? Reason, string? Jid, strin
 public record QrUpdated(string Qr);
 public record MessageStatusUpdate(string Id, string Chat, bool FromMe, string Status, string? OutboundId);
 public record MessageFailed(string OutboundId, string To, string? Type, string Error, int? Attempts);
-public record MessageReaction(string MessageId, string Chat, string? Emoji, bool FromMe, string? Sender);
+/// <summary><c>Emoji</c> nulo = reação removida. <c>FromMe</c>: foi o próprio dispositivo que reagiu.</summary>
+public record MessageReaction(string MessageId, string Chat, string? Emoji, bool FromMe, string? Sender)
+{
+    public bool MessageFromMe { get; init; }
+    public string? PreviousEmoji { get; init; }
+    public bool Removed { get; init; }
+    public string? SenderAlt { get; init; }
+    public DateTimeOffset? Timestamp { get; init; }
+}
+
+/// <summary>Presença de um contato. Em grupos, <c>Participant</c> é quem está digitando.</summary>
+public record PresenceUpdate
+{
+    public string Chat { get; init; } = "";
+    public string? ChatAlt { get; init; }
+    public string Participant { get; init; } = "";
+    public string? ParticipantAlt { get; init; }
+    public bool IsGroup { get; init; }
+    /// <summary>composing, recording, paused, available ou unavailable.</summary>
+    public string State { get; init; } = "";
+    public bool Typing { get; init; }
+    public bool Recording { get; init; }
+    public DateTimeOffset? LastSeen { get; init; }
+    public DateTimeOffset Timestamp { get; init; }
+}
 public record MessageEdited(string Id, string Chat, bool FromMe, string? Text);
 public record MessageDeleted(string Id, string Chat, bool FromMe);
 
@@ -282,6 +323,7 @@ public record ZapiEvent
     public MessageStatusUpdate? MessageStatus => Type == ZapiEventTypes.MessageStatus ? DataAs<MessageStatusUpdate>() : null;
     public MessageFailed? MessageFailed => Type == ZapiEventTypes.MessageFailed ? DataAs<MessageFailed>() : null;
     public MessageReaction? Reaction => Type == ZapiEventTypes.MessageReaction ? DataAs<MessageReaction>() : null;
+    public PresenceUpdate? Presence => Type == ZapiEventTypes.PresenceUpdate ? DataAs<PresenceUpdate>() : null;
 }
 
 public record EventPage

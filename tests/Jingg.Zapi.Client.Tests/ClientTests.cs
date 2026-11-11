@@ -76,6 +76,42 @@ public class ClientTests
     }
 
     [Fact]
+    public async Task Resposta_e_reacao_usam_as_rotas_da_mensagem()
+    {
+        var fake = new FakeHandler((_, _) => (HttpStatusCode.Accepted, Queued));
+        var messages = fake.Client().Device("d").Messages;
+        await messages.ReplyTextAsync("MSG 1", "Combinado");
+        await messages.ReactToAsync("MSG 1", "👍");
+        await messages.RemoveReactionAsync("MSG 1");
+
+        Assert.Equal("/v1/devices/d/messages/MSG%201/reply", fake.Calls[0].Path);
+        var reply = fake.Calls[0].Body!.Value;
+        Assert.Equal("Combinado", reply.GetProperty("text").GetString());
+        Assert.False(reply.TryGetProperty("to", out _));
+        Assert.True(reply.TryGetProperty("idempotencyKey", out _));
+        Assert.Equal("/v1/devices/d/messages/MSG%201/reaction", fake.Calls[1].Path);
+        Assert.Equal("👍", fake.Calls[1].Body!.Value.GetProperty("emoji").GetString());
+        Assert.Equal(HttpMethod.Delete, fake.Calls[2].Method);
+    }
+
+    [Fact]
+    public void Eventos_de_resposta_reacao_e_digitando_sao_tipados()
+    {
+        var reply = ZapiWebhook.Parse("""{"id":"e1","seq":1,"deviceId":"d","type":"message.received","timestamp":"2026-11-11T12:00:00Z","data":{"id":"M2","chat":"c","sender":"c","fromMe":false,"isGroup":false,"timestamp":"2026-11-11T12:00:00Z","type":"text","contentType":"extendedTextMessage","text":"sim","quoted":{"id":"M1","sender":"me","fromMe":true,"type":"text","text":"Vamos?"}}}""");
+        Assert.Equal(new QuotedMessage("M1", "me", true, "text", "Vamos?"), reply.Message!.Quoted);
+
+        var reaction = ZapiWebhook.Parse("""{"id":"e2","seq":2,"deviceId":"d","type":"message.reaction","timestamp":"2026-11-11T12:00:00Z","data":{"messageId":"M1","chat":"c","messageFromMe":true,"emoji":null,"previousEmoji":"👍","removed":true,"fromMe":false,"sender":"c","timestamp":"2026-11-11T12:00:00Z"}}""");
+        Assert.True(reaction.Reaction!.Removed);
+        Assert.Null(reaction.Reaction.Emoji);
+        Assert.Equal("👍", reaction.Reaction.PreviousEmoji);
+
+        var typing = ZapiWebhook.Parse("""{"id":"e3","seq":3,"deviceId":"d","type":"presence.update","timestamp":"2026-11-11T12:00:00Z","data":{"chat":"c","participant":"c","isGroup":false,"state":"composing","typing":true,"recording":false,"timestamp":"2026-11-11T12:00:00Z"}}""");
+        Assert.True(typing.Presence!.Typing);
+        Assert.Equal("composing", typing.Presence.State);
+        Assert.Null(reply.Presence);
+    }
+
+    [Fact]
     public async Task Figurinha_leva_pacote_e_autor_so_quando_informados()
     {
         var fake = new FakeHandler((_, _) => (HttpStatusCode.Accepted, Queued));

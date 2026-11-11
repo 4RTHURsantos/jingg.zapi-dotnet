@@ -103,6 +103,10 @@ public sealed class DeviceClient
     public Task<DeviceDetails> GetAsync(CancellationToken cancellationToken = default) => _http.GetAsync<DeviceDetails>(_base, cancellationToken);
     public Task<Device> RenameAsync(string name, CancellationToken cancellationToken = default) => _http.PatchAsync<Device>(_base, new { name }, cancellationToken);
 
+    /// <summary>Vale na hora. <c>PresenceEvents = true</c> liga os avisos de "digitando" (ver <see cref="DeviceSettings"/>).</summary>
+    public Task<Device> UpdateSettingsAsync(DeviceSettings settings, CancellationToken cancellationToken = default) =>
+        _http.PatchAsync<Device>(_base, new { settings }, cancellationToken);
+
     /// <summary>Inicia a conexão. Sem sessão salva, o dispositivo passa a gerar QR codes.</summary>
     public Task<Device> ConnectAsync(CancellationToken cancellationToken = default) => _http.PostAsync<Device>($"{_base}/connect", null, cancellationToken);
     /// <summary>Fecha a conexão mantendo a sessão: <see cref="ConnectAsync"/> retoma sem novo QR.</summary>
@@ -178,7 +182,7 @@ public sealed class MessagesApi
     private readonly string _base;
     internal MessagesApi(ZapiHttp http, string @base) => (_http, _base) = (http, @base);
 
-    private Task<OutboundMessage> SendAsync(string to, string type, Dictionary<string, object?> fields, SendOptions? options, CancellationToken ct)
+    private Task<OutboundMessage> SendAsync(string? to, string type, Dictionary<string, object?> fields, SendOptions? options, CancellationToken ct, string path = "/messages")
     {
         fields["to"] = to;
         fields["type"] = type;
@@ -198,7 +202,7 @@ public sealed class MessagesApi
         }
         // valores nulos de dicionário seriam enviados como null; a API espera o campo ausente
         var body = fields.Where(f => f.Value is not null).ToDictionary(f => f.Key, f => f.Value);
-        return _http.PostAsync<OutboundMessage>($"{_base}/messages", body, ct, idempotent: true);
+        return _http.PostAsync<OutboundMessage>(_base + path, body, ct, idempotent: true);
     }
 
     private Task<OutboundMessage> SendMediaAsync(string to, string type, MediaSource media, SendOptions? options, CancellationToken ct) =>
@@ -240,7 +244,25 @@ public sealed class MessagesApi
     public Task<OutboundMessage> SendPollAsync(string to, string name, IEnumerable<string> pollOptions, int selectableCount = 1, SendOptions? options = null, CancellationToken cancellationToken = default) =>
         SendAsync(to, "poll", new() { ["poll"] = new { name, options = pollOptions.ToArray(), selectableCount } }, options, cancellationToken);
 
-    /// <summary>Emoji vazio remove a reação.</summary>
+    /// <summary>Responde com texto a uma mensagem guardada pela API, citando-a; o destino é a conversa dela.</summary>
+    public Task<OutboundMessage> ReplyTextAsync(string messageId, string text, SendOptions? options = null, CancellationToken cancellationToken = default) =>
+        SendAsync(null, "text", new() { ["text"] = text }, options, cancellationToken, ReplyPath(messageId));
+
+    /// <summary>Responde com mídia (<paramref name="type"/>: image, video, audio, document ou sticker).</summary>
+    public Task<OutboundMessage> ReplyMediaAsync(string messageId, string type, MediaSource media, MediaOptions? options = null, CancellationToken cancellationToken = default) =>
+        SendAsync(null, type, new() { ["media"] = media.ToPayload() }, options, cancellationToken, ReplyPath(messageId));
+
+    private static string ReplyPath(string messageId) => $"/messages/{Uri.EscapeDataString(messageId)}/reply";
+
+    /// <summary>Reage a uma mensagem guardada pela API; reagir de novo troca o emoji anterior.</summary>
+    public Task<OutboundMessage> ReactToAsync(string messageId, string emoji, CancellationToken cancellationToken = default) =>
+        _http.PostAsync<OutboundMessage>($"{_base}/messages/{Uri.EscapeDataString(messageId)}/reaction",
+            new { emoji, idempotencyKey = Guid.NewGuid().ToString() }, cancellationToken, idempotent: true);
+
+    public Task<OutboundMessage> RemoveReactionAsync(string messageId, CancellationToken cancellationToken = default) =>
+        _http.DeleteAsync<OutboundMessage>($"{_base}/messages/{Uri.EscapeDataString(messageId)}/reaction", cancellationToken);
+
+    /// <summary>Forma direta de <see cref="ReactToAsync"/>, para mensagens que a API não guardou. Emoji vazio remove a reação.</summary>
     public Task<OutboundMessage> ReactAsync(string chat, string messageId, string emoji, CancellationToken cancellationToken = default) =>
         SendAsync(chat, "reaction", new() { ["messageId"] = messageId, ["emoji"] = emoji }, null, cancellationToken);
 
@@ -441,6 +463,7 @@ public sealed class ContactsApi
 
     /// <summary>Passa a receber eventos <c>presence.update</c> deste contato.</summary>
     public Task SubscribePresenceAsync(string jid, CancellationToken cancellationToken = default) => _http.PostAsync<JsonElement>(Path(jid, "presence/subscribe"), null, cancellationToken);
+    public Task UnsubscribePresenceAsync(string jid, CancellationToken cancellationToken = default) => _http.DeleteAsync(Path(jid, "presence/subscribe"), cancellationToken);
 }
 
 public sealed class GroupsApi

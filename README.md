@@ -43,6 +43,10 @@ await device.Messages.SendDocumentAsync("5511999990000", MediaSource.FromUrl("ht
 await device.Messages.SendStickerAsync("5511999990000", MediaSource.FromUrl("https://exemplo.com/gato.gif"),
     new StickerOptions { Pack = "Meu Pacote", Author = "Minha Empresa" });
 
+// responder e reagir a uma mensagem recebida (pelo id que veio no evento)
+await device.Messages.ReplyTextAsync(msg.Id, "Combinado!");
+await device.Messages.ReactToAsync(msg.Id, "👍");
+
 await device.Messages.WaitUntilSentAsync(sent.Id);   // opcional: aguarda sair da fila
 ```
 
@@ -80,6 +84,16 @@ app.MapPost("/webhooks/whatsapp", async (HttpRequest req) =>
 });
 ```
 
+Em uma resposta, `msg.Quoted` traz `Id`, `Sender`, `FromMe`, `Type` e `Text` da mensagem citada. Reações chegam em
+`ev.Reaction` (`Emoji` nulo quando removida). Para saber quando o contato está **digitando**, ligue a opção no
+dispositivo — a conta passa a aparecer online — e trate `ev.Presence`:
+
+```csharp
+await device.UpdateSettingsAsync(new DeviceSettings { PresenceEvents = true });
+// ...
+if (ev.Presence is { Typing: true } p) Console.WriteLine($"{p.Participant} está digitando");
+```
+
 A entrega é *ao menos uma vez*: deduplique por `ev.Id` (gravando-o no seu banco) e ordene por `ev.Seq`.
 
 **Sem webhook** — um fluxo ordenado por polling, que retoma de onde parou:
@@ -93,7 +107,7 @@ await foreach (var ev in device.Events.StreamAsync(after: ultimoSeq, cancellatio
 ```
 
 `ev.DataAs<T>()` converte os dados de qualquer evento; os mais usados têm atalho: `ev.Message`, `ev.Connection`,
-`ev.MessageStatus`, `ev.MessageFailed`, `ev.Reaction`. Os tipos estão em `ZapiEventTypes`.
+`ev.MessageStatus`, `ev.MessageFailed`, `ev.Reaction`, `ev.Presence`. Os tipos estão em `ZapiEventTypes`.
 
 ## O que a biblioteca faz por você
 
@@ -109,11 +123,11 @@ await foreach (var ev in device.Events.StreamAsync(after: ultimoSeq, cancellatio
 | | |
 |---|---|
 | `zapi.Devices` | `CreateAsync`, `ListAsync`, `GetAsync`, `GetOrCreateAsync`, `DeleteAsync` |
-| `zapi.Device(id)` | `ConnectAsync`, `DisconnectAsync`, `RestartAsync`, `LogoutAsync`, `GetQrAsync`, `GetQrPngAsync`, `GetPairingCodeAsync`, `ConnectAndGetQrAsync`, `WaitUntilConnectedAsync`, `RotateKeyAsync`, `UpdateProfileAsync`, `SendPresenceAsync`, `RejectCallAsync` |
-| `.Messages` | `SendText/Image/Video/Audio/Document/Sticker/Location/Contacts/PollAsync`, `ReactAsync`, `EditAsync`, `DeleteForEveryoneAsync`, `GetOutboundAsync`, `ListOutboundAsync`, `CancelAsync`, `RetryAsync`, `WaitUntilSentAsync`, `ListAsync`, `GetAsync`, `GetMediaUrlAsync`, `MarkReadAsync` |
+| `zapi.Device(id)` | `ConnectAsync`, `DisconnectAsync`, `RestartAsync`, `LogoutAsync`, `GetQrAsync`, `GetQrPngAsync`, `GetPairingCodeAsync`, `ConnectAndGetQrAsync`, `WaitUntilConnectedAsync`, `RotateKeyAsync`, `RenameAsync`, `UpdateSettingsAsync`, `UpdateProfileAsync`, `SendPresenceAsync`, `RejectCallAsync` |
+| `.Messages` | `SendText/Image/Video/Audio/Document/Sticker/Location/Contacts/PollAsync`, `ReplyTextAsync`, `ReplyMediaAsync`, `ReactToAsync`, `RemoveReactionAsync`, `ReactAsync`, `EditAsync`, `DeleteForEveryoneAsync`, `GetOutboundAsync`, `ListOutboundAsync`, `CancelAsync`, `RetryAsync`, `WaitUntilSentAsync`, `ListAsync`, `GetAsync`, `GetMediaUrlAsync`, `MarkReadAsync` |
 | `.Webhooks` | `ListAsync`, `CreateAsync`, `UpdateAsync`, `DeleteAsync`, `EnsureAsync`, `TestAsync`, `ListDeliveriesAsync`, `RetryDeliveryAsync`, `RetryFailedDeliveriesAsync` |
 | `.Events` | `ListAsync`, `GetLastSeqAsync`, `StreamAsync` |
-| `.Contacts` | `CheckAsync`, `GetPictureUrlAsync`, `GetStatusAsync`, `GetBusinessProfileAsync`, `BlockAsync`, `UnblockAsync`, `SubscribePresenceAsync` |
+| `.Contacts` | `CheckAsync`, `GetPictureUrlAsync`, `GetStatusAsync`, `GetBusinessProfileAsync`, `BlockAsync`, `UnblockAsync`, `SubscribePresenceAsync`, `UnsubscribePresenceAsync` |
 | `.Groups` | `ListAsync`, `GetAsync`, `CreateAsync`, `UpdateAsync`, `Add/RemoveParticipantsAsync`, `PromoteAsync`, `DemoteAsync`, `GetInviteLinkAsync`, `RevokeInviteLinkAsync`, `GetInviteInfoAsync`, `JoinAsync`, `LeaveAsync` |
 | `ZapiWebhook` | `Parse`, `VerifySignature`, `Sign` |
 
